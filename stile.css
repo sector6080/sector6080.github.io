@@ -25,3 +25,26 @@ a { color: var(--signal); }
 li { margin: 4px 0; }
 .todo { color: var(--danger); }
 .small { color: var(--dim); font-size: 13px; margin-top: 32px; }
+label { display: block; margin: 12px 0 4px; color: var(--dim); }
+input {
+  width: 100%;
+  max-width: 320px;
+  padding: 10px 12px;
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid #2b3a4a;
+  font: inherit;
+}
+button {
+  display: block;
+  margin-top: 12px;
+  padding: 10px 18px;
+  border: 1px solid var(--signal);
+  background: transparent;
+  color: var(--signal);
+  font: inherit;
+  cursor: pointer;
+}
+button.danger { border-color: var(--danger); color: var(--danger); }
+button:disabled { opacity: 0.4; cursor: default; }
+#esito { color: var(--signal); min-height: 1.6em; }

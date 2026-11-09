@@ -5,11 +5,24 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Helion · Eliminare l'account</title>
 <link rel="stylesheet" href="stile.css">
+<script src="https://accounts.google.com/gsi/client" async></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 </head>
 <body>
 <main>
 <p class="eyebrow">HELION · TASK FORCE</p>
 <h1>Eliminare l'account</h1>
+
+<h2>Da qui, subito</h2>
+<p>Entra con lo stesso account Google che usi nel gioco: l'account Helion viene eliminato appena confermi, senza aspettare.</p>
+<div id="google"></div>
+<div id="conferma" hidden>
+  <p>Account: <strong id="email"></strong></p>
+  <label for="scritta">Scrivi ELIMINA per confermare:</label>
+  <input id="scritta" autocomplete="off">
+  <button id="elimina" class="danger" disabled>Elimina l'account</button>
+</div>
+<p id="esito" role="status"></p>
 
 <h2>Dall'app</h2>
 <ol>
@@ -18,8 +31,8 @@
 <li>Nella sezione <strong>Account</strong> tocca <strong>Elimina account</strong>, scrivi ELIMINA e conferma.</li>
 </ol>
 
-<h2>Senza l'app</h2>
-<p>Scrivi a <span class="todo">[indirizzo email di contatto, da decidere]</span> dall'indirizzo email del tuo account Google, con oggetto "Elimina account Helion". L'account viene eliminato entro 30 giorni e ricevi una conferma.</p>
+<h2>Via email</h2>
+<p>Se non riesci in nessuno dei due modi, scrivi a <a href="mailto:sector6080.info@gmail.com">sector6080.info@gmail.com</a> dall'indirizzo del tuo account Google, con oggetto "Elimina account Helion". L'account viene eliminato entro 30 giorni e ricevi una conferma.</p>
 
 <h2>Cosa viene cancellato</h2>
 <ul>
@@ -27,7 +40,70 @@
 <li>la tua unità, i PU, il grado, gli ordini, i voti e le richieste di squadra;</li>
 <li>i tuoi messaggi in chat, le notifiche, gli utenti che hai bloccato e il token delle notifiche push.</li>
 </ul>
-<p>Le segnalazioni che riguardano la chat restano ai Game Master per la moderazione, senza il collegamento al tuo account. Dettagli nella <a href="privacy.html">privacy</a>.</p>
+<p>Le segnalazioni che riguardano la chat restano ai Game Master per la moderazione, senza il collegamento al tuo account, e si cancellano 6 mesi dopo essere state chiuse. Dettagli nella <a href="privacy.html">privacy</a>.</p>
 </main>
+
+<script>
+// Stessi dati pubblici dell'app: indirizzo del server, chiave pubblica e client ID di Google.
+const SUPABASE_URL = "https://jnfqfowidqwrmmvxnvhe.supabase.co";
+const SUPABASE_KEY = "sb_publishable_Lbh2m9zIjUCwEF6PVNbc4g_XkdJ7Gcz";
+const GOOGLE_CLIENT_ID = "119016207316-gt5rc6vp04filf9rtbvpubgcgprqbeco.apps.googleusercontent.com";
+
+const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
+const nonce = crypto.randomUUID();
+const esito = document.getElementById("esito");
+
+async function sha256(text) {
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Come nell'app: a Google va l'impronta del nonce, al server il nonce in chiaro
+async function onGoogle(response) {
+  esito.textContent = "Controllo l'account…";
+  const { data, error } = await client.auth.signInWithIdToken({ provider: "google", token: response.credential, nonce });
+  if (error) {
+    esito.textContent = "Accesso non riuscito: riprova, oppure scrivi all'indirizzo qui sotto.";
+    return;
+  }
+  // Un account appena creato vuol dire che con questo Google non si era mai entrati: lo si toglie subito
+  const created = Date.now() - new Date(data.user.created_at).getTime() < 60000;
+  if (created) {
+    await client.rpc("delete_my_account");
+    esito.textContent = "Con questo account Google non c'è nessun account Helion: non c'è niente da eliminare.";
+    return;
+  }
+  document.getElementById("email").textContent = data.user.email ?? "account Google";
+  document.getElementById("google").hidden = true;
+  document.getElementById("conferma").hidden = false;
+  esito.textContent = "";
+}
+
+document.getElementById("scritta").addEventListener("input", (e) => {
+  document.getElementById("elimina").disabled = e.target.value.trim().toUpperCase() !== "ELIMINA";
+});
+
+document.getElementById("elimina").addEventListener("click", async () => {
+  document.getElementById("elimina").disabled = true;
+  esito.textContent = "Elimino l'account…";
+  const { error } = await client.rpc("delete_my_account");
+  if (error) {
+    esito.textContent = "Eliminazione non riuscita: riprova, oppure scrivi all'indirizzo qui sotto.";
+    document.getElementById("elimina").disabled = false;
+    return;
+  }
+  document.getElementById("conferma").hidden = true;
+  esito.textContent = "Account eliminato. Puoi chiudere questa pagina.";
+});
+
+window.addEventListener("load", async () => {
+  if (!window.google || !window.supabase) {
+    esito.textContent = "La pagina non riesce a collegarsi: usa l'app o scrivi all'indirizzo qui sotto.";
+    return;
+  }
+  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogle, nonce: await sha256(nonce) });
+  google.accounts.id.renderButton(document.getElementById("google"), { theme: "filled_black", text: "signin_with", locale: "it" });
+});
+</script>
 </body>
 </html>
